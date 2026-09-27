@@ -1,6 +1,6 @@
 import { supabase, supabaseAdmin } from '@/lib/supabase';
-import { response, errorResponse } from '../app/utils/response'
-import { uploadImage, deleteImage } from '@/app/utils/uploadImage';
+import { response, errorResponse } from '@/utils/response'
+import { uploadImage, deleteImage } from '@/utils/uploadImage';
 
 export const GetMember = async () => {
     const { data, error } = await supabaseAdmin
@@ -8,9 +8,9 @@ export const GetMember = async () => {
         .select("*")
 
     if (error) {
-        return errorResponse(500, false, error.message)
+        return errorResponse(500, error.message)
     }
-    return response(200, true, "donebang", data)
+    return response(200, "donebang", data)
 }
 
 export const GetMemberById = async (id: string) => {
@@ -20,9 +20,9 @@ export const GetMemberById = async (id: string) => {
         .eq("id", id)
         .single()
     if (error) {
-        return errorResponse(500, false, error.message)
+        return errorResponse(500, error.message)
     }
-    return response(200, true, `Detail data member DSC: ${data.name}`, data)
+    return response(200, `Detail data member DSC: ${data.name}`, data)
 }
 
 export const PostMember = async (req: Request) => {
@@ -36,7 +36,7 @@ export const PostMember = async (req: Request) => {
         const points = Number(formData.get("points"));
 
         if (!name || !role) {
-            return errorResponse(400, false, "kolom nama atau role/jabatan tidak boleh kosong")
+            return errorResponse(400, "kolom nama atau role/jabatan tidak boleh kosong")
         }
 
         let fileName = null;
@@ -56,18 +56,17 @@ export const PostMember = async (req: Request) => {
             .select()
             .single();
         if (error) {
-            return errorResponse(500, false, error.message)
+            return errorResponse(500, error.message)
         }
-        return response(200, true, "Berhasil menambahkan data aggota DSC", data)
+        return response(200, "Berhasil menambahkan data aggota DSC", data)
     } catch (error) {
         console.log(error)
-        return errorResponse(500, false, "gagal upload gambar")
+        return errorResponse(500, "gagal upload gambar")
     }
 }
 
 export const PutMemberByid = async (req: Request, id: string) => {
     try {
-        console.log(req.headers.get("content-type"))
         const formData = await req.formData();
         const name = formData.get("name") as string;
         const role = formData.get("role") as string;
@@ -84,13 +83,12 @@ export const PutMemberByid = async (req: Request, id: string) => {
             .single();
 
         if (findError) {
-            return errorResponse(500, false, findError.message);
+            return errorResponse(500, findError.message);
         }
 
         if (!oldMember) {
             return errorResponse(
                 404,
-                false,
                 "Data member tidak ditemukan!"
             );
         }
@@ -105,7 +103,6 @@ export const PutMemberByid = async (req: Request, id: string) => {
         if (removePhoto && hasNewPhoto) {
             return errorResponse(
                 400,
-                false,
                 "Tidak dapat menghapus dan mengganti foto secara bersamaan"
             );
         }
@@ -140,7 +137,6 @@ export const PutMemberByid = async (req: Request, id: string) => {
 
                 return errorResponse(
                     500,
-                    false,
                     error.message
                 );
             }
@@ -152,7 +148,6 @@ export const PutMemberByid = async (req: Request, id: string) => {
 
             return response(
                 200,
-                true,
                 "Berhasil mengubah data anggota DSC",
                 data
             );
@@ -186,14 +181,12 @@ export const PutMemberByid = async (req: Request, id: string) => {
         if (error) {
             return errorResponse(
                 500,
-                false,
                 error.message
             );
         }
 
         return response(
             200,
-            true,
             "Berhasil mengubah data anggota DSC",
             data
         );
@@ -203,7 +196,6 @@ export const PutMemberByid = async (req: Request, id: string) => {
 
         return errorResponse(
             500,
-            false,
             error instanceof Error
                 ? error.message
                 : "Gagal mengubah data anggota"
@@ -221,7 +213,7 @@ export const DeleteMemberById = async (id: string) => {
         .single()
 
     if (error) {
-        return errorResponse(500, false, error.message)
+        return errorResponse(500, error.message)
     }
-    return response(200, true, "Berhasil menghapus data", data)
+    return response(200, "Berhasil menghapus data", data)
 }

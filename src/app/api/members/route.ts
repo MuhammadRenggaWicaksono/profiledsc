@@ -1,6 +1,5 @@
 import { GetMember, PostMember} from '@/server/members'
 
-
 export async function GET() {
     return await GetMember()
 }
