@@ -29,12 +29,12 @@ export function middleware(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     const secretKey = process.env.API_SECRET_KEY;
 
-    // if (authHeader !== `Bearer ${secretKey}`) {
-    //   return NextResponse.json(
-    //     { error: 'Unauthorized: Akses ditolak dari Middleware' },
-    //     { status: 401 }
-    //   );
-    // }
+    if (authHeader !== `Bearer ${secretKey}`) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Akses ditolak dari Middleware' },
+        { status: 401 }
+      );
+    }
   }
 
   return NextResponse.next();
