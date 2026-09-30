@@ -17,4 +17,3 @@ export function errorResponse(statusCode: number, message: string) {
         data: null
     }, { status: statusCode });
 }
-
