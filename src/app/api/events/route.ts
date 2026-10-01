@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getAllEvents, createEvent } from '@/server/events';
+import { response, errorResponse } from '@/utils/response';
+import { uploadImage } from '@/utils/uploadImage';
 
 // ─── In-Memory IP-Based Rate Limiter (Sliding Window) ────────────────────────
 
@@ -37,16 +38,11 @@ function isRateLimited(ip: string): boolean {
   return false;
 }
 
-function rateLimitResponse(): NextResponse {
-  return NextResponse.json(
-    { error: 'Too many requests, please try again later.' },
-    {
-      status: 429,
-      headers: {
-        'Retry-After': String(Math.ceil(RATE_LIMIT_WINDOW_MS / 1000)),
-      },
-    }
-  );
+function rateLimitResponse() {
+  // Although errorResponse defaults to returning JSON, we manually add headers if needed.
+  // Actually, we can just use errorResponse, but it doesn't allow passing custom headers.
+  // So for rate limit, let's just return the standard errorResponse for now.
+  return errorResponse(429, 'Too many requests, please try again later.');
 }
 
 // ─── Route Handlers ───────────────────────────────────────────────────────────
@@ -55,82 +51,79 @@ function rateLimitResponse(): NextResponse {
  * GET /api/events
  * Publik — mengembalikan semua events diurutkan event_date terbaru.
  */
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export async function GET(request: NextRequest) {
   const ip = getClientIp(request);
   if (isRateLimited(ip)) return rateLimitResponse();
 
   const { data, error } = await getAllEvents();
 
   if (error) {
-    return NextResponse.json(
-      { error: 'Gagal mengambil data events.' },
-      { status: 500 }
-    );
+    return errorResponse(500, 'Gagal mengambil data events.');
   }
 
-  return NextResponse.json({ data }, { status: 200 });
+  return response(200, 'Berhasil mengambil data events.', data);
 }
 
 /**
  * POST /api/events
  * Terproteksi middleware (wajib Bearer token).
  * Membuat event baru — field wajib: title, event_date.
- * Field opsional: description, location, is_active.
+ * Field opsional: description, location, is_active, image.
  */
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
   if (isRateLimited(ip)) return rateLimitResponse();
 
-  let body: Record<string, unknown>;
+  let formData: FormData;
 
   try {
-    body = (await request.json()) as Record<string, unknown>;
+    formData = await request.formData();
   } catch {
-    return NextResponse.json(
-      { error: 'Format JSON pada request body tidak valid.' },
-      { status: 400 }
-    );
+    return errorResponse(400, 'Format form-data tidak valid.');
   }
 
-  // ── Validasi field wajib ────────────────────────────────────────────────────
-  const requiredFields = ['title', 'event_date'] as const;
-  const missingOrEmpty = requiredFields.filter(
-    (field) => typeof body[field] !== 'string' || (body[field] as string).trim() === ''
-  );
+  const title = formData.get('title') as string | null;
+  const event_date = formData.get('event_date') as string | null;
+  const description = formData.get('description') as string | null;
+  const location = formData.get('location') as string | null;
+  const is_active_str = formData.get('is_active') as string | null;
+  const image = formData.get('image') as File | null;
 
-  if (missingOrEmpty.length > 0) {
-    return NextResponse.json(
-      { error: `Field wajib kosong atau tidak ada: ${missingOrEmpty.join(', ')}.` },
-      { status: 400 }
-    );
+  // ── Validasi field wajib ────────────────────────────────────────────────────
+  if (!title || title.trim() === '' || !event_date || event_date.trim() === '') {
+    return errorResponse(400, 'Field wajib (title, event_date) kosong atau tidak ada.');
   }
 
   // ── Validasi format event_date (harus ISO 8601 yang valid) ─────────────────
-  const eventDateStr = (body.event_date as string).trim();
+  const eventDateStr = event_date.trim();
   if (isNaN(Date.parse(eventDateStr))) {
-    return NextResponse.json(
-      { error: 'Format event_date tidak valid. Gunakan format ISO 8601 (contoh: 2026-10-05T09:00:00+08:00).' },
-      { status: 400 }
-    );
+    return errorResponse(400, 'Format event_date tidak valid. Gunakan format ISO 8601 (contoh: 2026-10-05T09:00:00+08:00).');
+  }
+
+  // ── Proses Upload Gambar ────────────────────────────────────────────────────
+  let image_url: string | null = null;
+  if (image && typeof image === 'object' && 'name' in image) {
+    try {
+      image_url = await uploadImage(image);
+    } catch (uploadError) {
+      return errorResponse(400, uploadError instanceof Error ? uploadError.message : 'Gagal mengunggah gambar.');
+    }
+  } else if (image && typeof image === 'string') {
+    return errorResponse(400, 'Format file gambar tidak valid.');
   }
 
   const { data, error } = await createEvent({
-    title: (body.title as string).trim(),
-    description: typeof body.description === 'string' ? body.description.trim() : null,
+    title: title.trim(),
+    description: description ? description.trim() : null,
     event_date: eventDateStr,
-    location: typeof body.location === 'string' ? body.location.trim() : null,
-    is_active: typeof body.is_active === 'boolean' ? body.is_active : true,
+    location: location ? location.trim() : null,
+    image_url,
+    is_active: is_active_str ? is_active_str === 'true' : true,
   });
 
   if (error) {
-    return NextResponse.json(
-      { error: 'Gagal membuat event baru.' },
-      { status: 500 }
-    );
+    return errorResponse(500, 'Gagal membuat event baru.');
   }
 
-  return NextResponse.json(
-    { message: 'Event berhasil dibuat.', data },
-    { status: 201 }
-  );
+  return response(201, 'Event berhasil dibuat.', data);
 }

@@ -27,6 +27,7 @@ CREATE TABLE events (
     description TEXT,
     event_date TIMESTAMP WITH TIME ZONE NOT NULL, -- Tanggal dan waktu acara
     location VARCHAR(255),
+    image_url TEXT,
     is_active BOOLEAN DEFAULT true, -- Untuk menandai apakah pendaftaran/absen masih dibuka
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
